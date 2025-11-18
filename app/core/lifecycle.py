@@ -106,7 +106,8 @@ class ApplicationLifecycleManager:
             Exception: If RAG engine initialization fails
         """
         try:
-            from ..services.lightweight_llm_rag import lightweight_llm_rag
+            # Use the correct module name for the lightweight RAG engine
+            from ..services.lightweight_llm_rag_founders_ai import lightweight_llm_rag
             logger.info("Initializing RAG engine...")
             await lightweight_llm_rag.initialize()
             logger.info("RAG engine initialized successfully")
@@ -138,7 +139,8 @@ class ApplicationLifecycleManager:
             Exception: If multi-hop reasoning initialization fails
         """
         try:
-            from ..services.multi_hop_reasoning import multi_hop_reasoning_engine
+            # Use the correct module name for multi-hop reasoning engine
+            from ..services.multi_hop_reasoning_founders_ai import multi_hop_reasoning_engine
             logger.info("Initializing multi-hop reasoning services...")
             await multi_hop_reasoning_engine.initialize()
             logger.info("Multi-hop reasoning services initialized successfully")
