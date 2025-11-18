@@ -78,6 +78,23 @@ class HallucinationValidator:
             "conversion rate",
         ]
 
+    def validate(self, response: str, sources: Any):
+        """Wrapper used by orchestrator. Maps (response, sources) to validate_response()."""
+        # Convert list of sources → context
+        if isinstance(sources, list):
+            context = " ".join([str(s) for s in sources])
+        else:
+            context = str(sources)
+
+        query = ""  # orchestrator doesn't provide query
+
+        result = self.validate_response(response, context, query)
+
+        if not result.is_valid:
+            return self.get_safe_response(query, context)
+
+        return response
+
     def validate_response(
         self,
         response: str,

@@ -7,7 +7,7 @@ automatic cleanup of expired requests, and comprehensive rate limit information.
 
 import time
 import logging
-from typing import Dict, List
+from typing import Dict, List, Any
 from collections import defaultdict
 from .exceptions import RateLimitExceededError
 
@@ -131,7 +131,7 @@ class RateLimiter:
         
         self.record_request(client_ip)
     
-    def get_rate_limit_info(self, client_ip: str) -> Dict[str, any]:
+    def get_rate_limit_info(self, client_ip: str) -> Dict[str, Any]:
         """
         Get comprehensive rate limit information for the client.
         

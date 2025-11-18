@@ -76,9 +76,13 @@ class DatabaseManager:
     async def get_connection(self):
         if self._pool is None:
             await self.initialize()
+
+        if self._pool is None:
+            raise RuntimeError("Database pool not initialized. Check DATABASE_URL.")
+
         async with self._pool.acquire() as connection:
             yield connection
-    
+            
     async def execute_query(self, query: str, *args) -> List[Dict[str, Any]]:
         async with self.get_connection() as conn:
             rows = await conn.fetch(query, *args)

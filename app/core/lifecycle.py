@@ -132,21 +132,13 @@ class ApplicationLifecycleManager:
             raise
     
     async def _initialize_multi_hop_reasoning(self) -> None:
-        """
-        Initialize multi-hop reasoning services.
-        
-        Raises:
-            Exception: If multi-hop reasoning initialization fails
-        """
         try:
-            # Use the correct module name for multi-hop reasoning engine
             from ..services.multi_hop_reasoning_founders_ai import multi_hop_reasoning_engine
-            logger.info("Initializing multi-hop reasoning services...")
-            await multi_hop_reasoning_engine.initialize()
-            logger.info("Multi-hop reasoning services initialized successfully")
+            logger.info("Multi-hop reasoning engine ready")
         except Exception as e:
             logger.error(f"Multi-hop reasoning initialization failed: {e}")
             raise
+
     
     async def _shutdown_database(self) -> None:
         """
