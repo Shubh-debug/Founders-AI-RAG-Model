@@ -22,8 +22,6 @@ try:
     from langchain.tools import BaseTool
     from langchain_openai import ChatOpenAI
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain.schema import HumanMessage, AIMessage, SystemMessage
-    from langchain_core.messages import BaseMessage
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     logger.warning("LangChain not available, using fallback implementation")
