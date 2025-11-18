@@ -1,8 +1,8 @@
 """
-Response formatting utilities for API responses and text content cleaning.
+Response formatting utilities for Founders AI RAG System.
 
-Provides text cleaning, legal response formatting, and error response formatting
-with specialized handling for legal references and document structure.
+Cleans model outputs, formats RAG + multi-hop responses,
+and produces consistent API-safe JSON responses.
 """
 
 import re
@@ -14,180 +14,154 @@ logger = logging.getLogger(__name__)
 
 class ResponseFormatter:
     """
-    Utility class for formatting API responses and cleaning text content.
-    
-    Provides methods for cleaning and formatting text responses to improve
-    readability and consistency across the application.
+    Standard formatter for all Founders-AI responses.
+
+    - Cleans LLM output
+    - Formats RAG responses
+    - Formats multi-hop responses
+    - Formats orchestrator / adaptive pipeline responses
     """
-    
+
+    # ---------------------------------------------------------
+    # TEXT CLEANING
+    # ---------------------------------------------------------
     @staticmethod
-    def clean_text_for_display(text: str) -> str:
-        """
-        Clean and format text for clean display by removing escape characters and formatting.
-        
-        Args:
-            text: Raw text to clean
-            
-        Returns:
-            str: Cleaned and formatted text
-        """
+    def clean_text(text: str) -> str:
+        """Clean and normalize text for display."""
         if not text:
-            return text
-        
-        cleaned_text = text.replace('\\n', '\n')
-        cleaned_text = cleaned_text.replace('\\"', '"')
-        cleaned_text = cleaned_text.replace('\\\\', '\\')
-        
-        cleaned_text = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned_text)
-        cleaned_text = re.sub(r'[ \t]+', ' ', cleaned_text)
-        
-        cleaned_text = re.sub(r'\n[ \t]+', '\n', cleaned_text)
-        cleaned_text = re.sub(r'[ \t]+\n', '\n', cleaned_text)
-        
-        cleaned_text = re.sub(r'([.!?])([A-Z])', r'\1 \2', cleaned_text)
-        cleaned_text = re.sub(r'([a-z])([A-Z])', r'\1 \2', cleaned_text)
-        
-        cleaned_text = re.sub(r'Article\s+(\d+)', r'Article \1', cleaned_text)
-        cleaned_text = re.sub(r'Section\s+(\d+)', r'Section \1', cleaned_text)
-        cleaned_text = re.sub(r'Chapter\s+(\d+)', r'Chapter \1', cleaned_text)
-        
-        cleaned_text = re.sub(r'[.]{3,}', '...', cleaned_text)
-        cleaned_text = re.sub(r'[-]{3,}', '---', cleaned_text)
-        
-        cleaned_text = re.sub(r'\n(\d+\.)', r'\n\n\1', cleaned_text)
-        cleaned_text = re.sub(r'\n([-\*])', r'\n\n\1', cleaned_text)
-        
-        cleaned_text = re.sub(r'\n([A-Z][A-Z\s]+:)\n', r'\n\n**\1**\n', cleaned_text)
-        cleaned_text = re.sub(r'\n(\d+\.\s*[A-Z][^:]+:)\n', r'\n\n\1\n', cleaned_text)
-        
-        cleaned_text = re.sub(r'\b(Article|Section|Chapter)\s+(\d+)\b', r'**\1 \2**', cleaned_text)
-        
-        cleaned_text = re.sub(r'([.!?])\s*\n([A-Z])', r'\1\n\n\2', cleaned_text)
-        
-        cleaned_text = re.sub(r'\n{3,}', '\n\n', cleaned_text)
-        cleaned_text = re.sub(r'^\s+', '', cleaned_text, flags=re.MULTILINE)
-        
-        return cleaned_text.strip()
-    
+            return ""
+
+        # Normalize escaped characters
+        text = text.replace("\\n", "\n").replace('\\"', '"').replace('\\\\', '\\')
+
+        # Remove excessive whitespace
+        text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n[ \t]+", "\n", text)
+        text = re.sub(r"[ \t]+\n", "\n", text)
+
+        # Fix sentence spacing (Make sure punctuation is followed by a space)
+        text = re.sub(r"([.!?])([A-Z])", r"\1 \2", text)
+
+        # Normalize long punctuation
+        text = re.sub(r"[.]{3,}", "...", text)
+        text = re.sub(r"[-]{4,}", "---", text)
+
+        # Fix missing newline after bullet points or numbered lists
+        text = re.sub(r"\n(\d+\.)", r"\n\n\1", text)
+        text = re.sub(r"\n([\-*])", r"\n\n\1", text)
+
+        # Remove multiple blank lines
+        text = re.sub(r"\n{3,}", "\n\n", text)
+
+        return text.strip()
+
+    # ---------------------------------------------------------
+    # RAG RESPONSE FORMATTER
+    # ---------------------------------------------------------
     @staticmethod
-    def format_legal_response(response_data: Dict[str, Any]) -> Dict[str, Any]:
+    def format_rag_response(data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Format a legal research response for API output.
-        
-        Args:
-            response_data: Raw response data from the RAG system
-            
-        Returns:
-            Dict[str, Any]: Formatted response data
+        Format RAG engine response for API output.
+
+        Expected input keys:
+        - response
+        - query
+        - context
+        - metadata
+        - processing_time
         """
         try:
-            formatted_response = ResponseFormatter.clean_text_for_display(
-                response_data.get("response", "")
+            formatted_text = ResponseFormatter.clean_text(
+                data.get("response", "")
             )
-            
+
             return {
-                "response": formatted_response,
-                "query": response_data.get("query", ""),
-                "context": response_data.get("sources", []),
-                "metadata": response_data.get("metadata", {}),
-                "source": response_data.get("source", "rag_engine"),
-                "response_time_ms": int(response_data.get("processing_time", 0) * 1000)
+                "response": formatted_text,
+                "query": data.get("query", ""),
+                "context": data.get("context", []),
+                "metadata": data.get("metadata", {}),
+                "source": "founders_ai_rag_engine",
+                "response_time_ms": int(data.get("processing_time", 0) * 1000)
             }
+
         except Exception as e:
-            logger.error(f"Error formatting legal response: {e}")
-            return response_data
-    
+            logger.error(f"Failed to format RAG response: {e}")
+            return data
+
+    # ---------------------------------------------------------
+    # MULTI-HOP RESPONSE FORMATTER
+    # ---------------------------------------------------------
     @staticmethod
-    def format_agent_response(agent_data: Dict[str, Any]) -> Dict[str, Any]:
+    def format_multi_hop_response(data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Format a legal agent response for API output.
-        
-        Args:
-            agent_data: Raw response data from the legal agent
-            
-        Returns:
-            Dict[str, Any]: Formatted response data
+        Format multi-hop reasoning output.
+
+        Expected input keys:
+        - final_answer
+        - steps
+        - execution_time
+        - combined_context
         """
         try:
-            formatted_response = ResponseFormatter.clean_text_for_display(
-                agent_data.get("response", "")
+            answer = ResponseFormatter.clean_text(
+                data.get("final_answer", "")
             )
-            
+
             return {
-                "response": formatted_response,
-                "query": agent_data.get("query", ""),
-                "context": agent_data.get("sources", []),
+                "response": answer,
+                "steps": data.get("steps", []),
+                "context": data.get("combined_context", []),
                 "metadata": {
-                    "algorithm": "langchain_agent",
-                    "citations": agent_data.get("citations", []),
-                    "domain": agent_data.get("domain", "Other"),
-                    "confidence": agent_data.get("confidence", 0.0),
-                    "tools_used": agent_data.get("tools_used", [])
+                    "algorithm": "multi_hop_reasoning",
                 },
-                "source": "legal_agent",
-                "response_time_ms": 0
+                "source": "founders_ai_multi_hop",
+                "response_time_ms": int(data.get("execution_time", 0) * 1000)
             }
+
         except Exception as e:
-            logger.error(f"Error formatting agent response: {e}")
-            return agent_data
-    
+            logger.error(f"Failed to format multi-hop response: {e}")
+            return data
+
+    # ---------------------------------------------------------
+    # AGENT / ORCHESTRATION FORMATTER
+    # ---------------------------------------------------------
     @staticmethod
-    def clean_context_content(content: str) -> str:
+    def format_orchestrator_response(data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Clean content for better context presentation in RAG responses.
-        
-        Args:
-            content: Raw content to clean
-            
-        Returns:
-            str: Cleaned content
+        Format adaptive reasoning / orchestrator output.
         """
-        if not content:
-            return content
-        
-        # Normalize whitespace
-        cleaned_content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
-        cleaned_content = re.sub(r'[ \t]+', ' ', cleaned_content)
-        cleaned_content = re.sub(r'\n[ \t]+', '\n', cleaned_content)
-        cleaned_content = re.sub(r'[ \t]+\n', '\n', cleaned_content)
-        
-        # Fix sentence spacing
-        cleaned_content = re.sub(r'([a-z])([A-Z])', r'\1 \2', cleaned_content)
-        cleaned_content = re.sub(r'([.!?])([A-Z])', r'\1 \2', cleaned_content)
-        
-        # Format legal references
-        cleaned_content = re.sub(r'Article\s+(\d+)', r'Article \1', cleaned_content)
-        cleaned_content = re.sub(r'Section\s+(\d+)', r'Section \1', cleaned_content)
-        cleaned_content = re.sub(r'Chapter\s+(\d+)', r'Chapter \1', cleaned_content)
-        
-        # Normalize punctuation
-        cleaned_content = re.sub(r'[.]{3,}', '...', cleaned_content)
-        cleaned_content = re.sub(r'[-]{3,}', '---', cleaned_content)
-        
-        return cleaned_content.strip()
-    
+        try:
+            return {
+                "response": ResponseFormatter.clean_text(data.get("response", "")),
+                "query": data.get("query", ""),
+                "context": data.get("context", []),
+                "metadata": data.get("metadata", {}),
+                "pipeline_used": data.get("pipeline_used", "unknown"),
+                "source": "founders_ai_orchestrator",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to format orchestrator response: {e}")
+            return data
+
+    # ---------------------------------------------------------
+    # ERROR FORMATTER
+    # ---------------------------------------------------------
     @staticmethod
-    def format_error_response(error_message: str, error_code: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Format an error response for API output.
-        
-        Args:
-            error_message: Error message to include
-            error_code: Optional error code
-            
-        Returns:
-            Dict[str, Any]: Formatted error response
-        """
-        response = {
-            "error": "An error occurred while processing your request",
-            "detail": error_message
+    def format_error(error_message: str, error_code: Optional[str] = None) -> Dict[str, Any]:
+        """Format errors from exceptions into consistent API output."""
+        error_response = {
+            "error": True,
+            "message": error_message,
+            "source": "founders_ai_backend"
         }
-        
+
         if error_code:
-            response["error_code"] = error_code
-        
-        return response
+            error_response["error_code"] = error_code
+
+        return error_response
 
 
-# Global formatter instance
+# Global instance used everywhere
 response_formatter = ResponseFormatter()

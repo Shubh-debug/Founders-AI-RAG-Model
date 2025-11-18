@@ -96,7 +96,7 @@ async def process_founder_query(request: Request, payload: FounderQueryRequest =
     Process founder query via Lightweight LLM RAG engine.
     Routes to multi-hop or adaptive RAG if required.
     """
-    client_ip = request.client.host
+    client_ip = getattr(request.client, "host", "unknown")
 
     try:
         rate_limiter.check_and_record_request(client_ip)
@@ -107,26 +107,25 @@ async def process_founder_query(request: Request, payload: FounderQueryRequest =
         should_use_multi_hop, complexity = query_complexity_detector.should_use_multi_hop_reasoning(payload.query)
 
         if payload.force_multi_hop or (payload.enable_multi_hop_reasoning and should_use_multi_hop):
-            result = await _process_multi_hop_query(payload, complexity)
-        else:
-            result = await lightweight_llm_rag.process_query(
+
+            multi_hop_result = await _process_multi_hop_query(payload, complexity)
+
+            # Convert Pydantic → dict
+            result = multi_hop_result.model_dump()
+
+            return FounderQueryResponse(
+                response=result["final_answer"],
                 query=payload.query,
-                top_k=payload.top_k,
-                intent=getattr(payload, "intent", None),
+                context=[{"citation": c} for c in result["citations"]],
+                metadata={
+                    "algorithm": "multi_hop_reasoning",
+                    "complexity": result["complexity_level"],
+                    "processing_time": result["total_execution_time"],
+                    "confidence": result["overall_confidence"],
+                },
+                source="multi-hop",
+                response_time_ms=int(result["total_execution_time"] * 1000),
             )
-
-        return FounderQueryResponse(
-            response=result.get("response", ""),
-            query=payload.query,
-            context=result.get("sources", []),
-            metadata={
-                "algorithm": "lightweight_rag",
-                "processing_time": result.get("processing_time", 0),
-            },
-            source="rag_engine",
-            response_time_ms=int(result.get("processing_time", 0) * 1000),
-        )
-
     except Exception as e:
         logger.error(f"RAG query failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -138,7 +137,7 @@ async def process_founder_query(request: Request, payload: FounderQueryRequest =
 @router.post("/adaptive-query", response_model=FounderQueryResponse)
 async def process_adaptive_query(request: Request, payload: FounderQueryRequest = Body(...)):
     """Process query via Adaptive RAG with intent-based orchestration."""
-    client_ip = request.client.host
+    client_ip = getattr(request.client, "host", "unknown")
     try:
         if rate_limiter.is_rate_limit_exceeded(client_ip):
             raise RateLimitExceededError("Rate limit exceeded for adaptive queries.")
@@ -237,7 +236,7 @@ async def ingest_pdf_documents(files: List[UploadFile] = File(...)):
     try:
         paths = []
         for file in files:
-            if not file.filename.endswith(".pdf"):
+            if not (file.filename or "").endswith(".pdf"):
                 continue
             path = f"/tmp/{file.filename}"
             with open(path, "wb") as buffer:

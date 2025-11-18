@@ -3,7 +3,7 @@ from typing import Optional, List
 from functools import lru_cache
 from pydantic_settings import BaseSettings
 from pydantic import Field, field_validator, ConfigDict, ValidationInfo
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # ------------------------------

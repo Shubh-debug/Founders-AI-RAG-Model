@@ -1,5 +1,5 @@
 """
-Core package for the legal research assistant.
+Core package for the Founders AI RAG system.
 
 This package contains core functionality including configuration,
 database management, exceptions, utilities, and lifecycle management.
@@ -7,17 +7,22 @@ database management, exceptions, utilities, and lifecycle management.
 
 from .config import settings, get_settings
 from .database import db_manager, get_database_manager, init_database
+
+# Updated imports — match the new Founders AI exception names
 from .exceptions import (
-    LegalResearchException,
-    DocumentProcessingError,
-    EmbeddingGenerationError,
-    DatabaseConnectionError,
-    CacheOperationError,
-    LegalAgentError,
+    FoundersAIException,
+    PDFIngestionError,
+    EmbeddingError,
+    DatabaseError,
+    CacheError,
+    OrchestrationError,
     QueryProcessingError,
     RateLimitExceededError,
-    ConfigurationError
+    ConfigurationError,
+    MultiHopReasoningError,
+    RAGRetrievalError
 )
+
 from .rate_limiter import rate_limiter, RateLimiter
 from .response_formatter import response_formatter, ResponseFormatter
 from .utils import (
@@ -35,33 +40,33 @@ __all__ = [
     # Configuration
     "settings",
     "get_settings",
-    
+
     # Database
     "db_manager",
-    "get_database_manager", 
+    "get_database_manager",
     "init_database",
-    
-    # Exceptions
-    "LegalResearchException",
-    "DocumentProcessingError",
-    "EmbeddingGenerationError",
-    "DatabaseConnectionError",
-    "CacheOperationError",
-    "LegalAgentError",
+
+    # Exceptions (Final, Founders AI–specific)
+    "FoundersAIException",
+    "PDFIngestionError",
+    "EmbeddingError",
+    "DatabaseError",
+    "CacheError",
+    "OrchestrationError",
     "QueryProcessingError",
     "RateLimitExceededError",
     "ConfigurationError",
-    
+    "MultiHopReasoningError",
+    "RAGRetrievalError",
+
     # Rate limiting
     "rate_limiter",
     "RateLimiter",
-    
+
     # Response formatting
     "response_formatter",
     "ResponseFormatter",
-    
-    # Lifecycle management (imported locally to avoid circular imports)
-    
+
     # Utilities
     "text_processor",
     "validation_utils",
@@ -71,4 +76,4 @@ __all__ = [
     "ValidationUtils",
     "DataTransformer",
     "time_operation"
-] 
+]

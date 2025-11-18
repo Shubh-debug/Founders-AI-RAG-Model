@@ -28,7 +28,7 @@ except Exception:
         # fallback for direct execution
         sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
         try:
-            from Foundersai.core.config import settings
+            from Founders-AI-RAG-Model.core.config import settings
         except Exception:
             class DummySettings:
                 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -158,51 +158,76 @@ class SmartCache:
     async def get(self, key: str) -> Optional[Any]:
         if await self._should_use_redis():
             try:
-                val = await self._safe_await(lambda: self.redis_client.get(key))
+                client = self.redis_client  # <-- FIX
+                if client is None:
+                    raise RuntimeError("Redis client unexpectedly None")
+
+                val = await self._safe_await(lambda: client.get(key))
                 if val is None:
                     return await self.memory_cache.get(key)
+
                 try:
                     return json.loads(val)
                 except Exception:
                     return val
+
             except Exception as e:
                 logger.debug(f"Redis GET failed ({e})")
+
         return await self.memory_cache.get(key)
+
 
     async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         ttl = ttl or getattr(settings, "cache_ttl_seconds", 600)
+
         try:
             if await self._should_use_redis():
-                await self._safe_await(lambda: self.redis_client.setex(key, ttl, json.dumps(value, default=str)))
+                client = self.redis_client  
+                if client is None:
+                    raise RuntimeError("Redis client unexpectedly None")
+
+                await self._safe_await(lambda: client.setex(key, ttl, json.dumps(value, default=str)))
                 return True
+
         except Exception as e:
             logger.debug(f"Redis SET failed ({e})")
+
         await self.memory_cache.set(key, value, ttl)
         return True
+
 
     async def delete(self, key: str) -> bool:
         try:
             if await self._should_use_redis():
-                await self._safe_await(lambda: self.redis_client.delete(key))
+                client = self.redis_client   # <-- FIX: promote to local non-optional
+                if client is None:
+                    raise RuntimeError("Redis client unexpectedly None")
+
+                await self._safe_await(lambda: client.delete(key))
         except Exception as e:
             logger.debug(f"Redis DELETE failed ({e})")
+
         await self.memory_cache.delete(key)
         return True
 
+
     async def delete_pattern(self, pattern: str) -> int:
         deleted = 0
-        try:
-            if await self._should_use_redis():
-                async for key in self.redis_client.scan_iter(match=pattern):
-                    await self._safe_await(lambda: self.redis_client.delete(key))
-                    deleted += 1
-                logger.info(f"Deleted {deleted} keys for pattern {pattern}")
-        except Exception as e:
-            logger.debug(f"Redis pattern delete failed: {e}")
+
+        if await self._should_use_redis():
+            client = self.redis_client
+            if client is not None:  
+                try:
+                    async for key in client.scan_iter(match=pattern):
+                        await self._safe_await(lambda: client.delete(key))
+                        deleted += 1
+                except Exception:
+                    pass
+
         await self.memory_cache.clear()
         return deleted
 
-    async def get_or_set(self, key: str, factory: Callable, ttl: int = None) -> Any:
+    async def get_or_set(self, key: str, factory: Callable, ttl: Optional[int] = None) -> Any:
         cached = await self.get(key)
         if cached is not None:
             return cached
@@ -210,19 +235,23 @@ class SmartCache:
         await self.set(key, value, ttl)
         return value
 
-    async def increment(self, key: str, amount: int = 1, ttl: int = None) -> int:
+    async def increment(self, key: str, amount: int = 1, ttl: Optional[int] = None) -> int:
         """Async-safe increment with Redis fallback."""
-        try:
-            if await self._should_use_redis():
-                val = await self._safe_await(lambda: self.redis_client.incrby(key, amount))
+        use_redis = await self._should_use_redis()
+        client = self.redis_client  # type narrowing
+
+        if use_redis and client is not None:
+            try:
+                val = await self._safe_await(lambda: client.incrby(key, amount))
                 if val is None:
                     val = 0
-                if ttl:
-                    await self._safe_await(lambda: self.redis_client.expire(key, ttl))
+                if ttl is not None:
+                    await self._safe_await(lambda: client.expire(key, ttl))
                 return int(val)
-        except Exception as e:
-            logger.warning(f"Redis increment failed ({e}), using memory fallback")
+            except Exception as e:
+                logger.warning(f"Redis increment failed ({e}), using memory fallback")
 
+        # Memory fallback
         current = await self.memory_cache.get(key) or 0
         new_val = int(current) + amount
         await self.memory_cache.set(key, new_val, ttl)
@@ -230,9 +259,14 @@ class SmartCache:
 
     async def get_stats(self) -> Dict[str, Any]:
         stats = {"backend": "memory", "size": len(self.memory_cache.cache)}
+
         try:
             if await self._should_use_redis():
-                info = await self._safe_await(lambda: self.redis_client.info())
+                client = self.redis_client  # <-- FIX: local non-optional reference
+                if client is None:
+                    raise RuntimeError("Redis client unexpectedly None")
+
+                info = await self._safe_await(lambda: client.info())
                 if info:
                     stats.update({
                         "backend": "redis",
@@ -241,6 +275,7 @@ class SmartCache:
                     })
         except Exception as e:
             logger.debug(f"Redis INFO failed: {e}")
+
         return stats
 
 
@@ -282,7 +317,7 @@ class RAGCache:
     def __init__(self, cache_instance: SmartCache):
         self.cache = cache_instance
 
-    async def cache_rag_query(self, query: str, result: Dict[str, Any], algorithm: str = "hybrid", ttl: int = None):
+    async def cache_rag_query(self,query: str,result: Dict[str, Any],algorithm: str = "hybrid",ttl: Optional[int] = None):
         key = f"rag_query:{algorithm}:{hashlib.sha256(query.encode()).hexdigest()}"
         return await self.cache.set(key, result, ttl)
 

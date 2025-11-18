@@ -43,6 +43,7 @@ class DocumentTitleExtractor:
 
         self.compiled_patterns = [re.compile(pattern) for pattern in self.title_patterns]
 
+    
     def extract_title(self, content: str, filename: str) -> str:
         """
         Extract a meaningful title from document content and filename.
@@ -300,6 +301,23 @@ class MetadataProcessor:
 
     def __init__(self):
         self.enhancer = DocumentMetadataEnhancer()
+
+    def add_metadata(self, response: str, query: Optional[str] = None) -> str:
+        """
+        Add lightweight response-time metadata to the final answer.
+        """
+        if query is None:
+            query_text = "N/A"
+        else:
+            query_text = query
+
+        enriched = (
+            f"{response}\n\n"
+            f"---\n"
+            f"*Query:* {query_text}\n"
+            f"*Metadata Version:* 2.0"
+        )
+        return enriched
 
     def process_document_metadata(
         self,
