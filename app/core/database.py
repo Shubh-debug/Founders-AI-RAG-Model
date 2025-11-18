@@ -125,6 +125,7 @@ async def _init_postgres_database():
     try:
         await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         
+        # Core documents table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 id SERIAL PRIMARY KEY,
@@ -157,6 +158,27 @@ async def _init_postgres_database():
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
         """)
+
+        # New: Users and user form responses for personalization
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id VARCHAR(255) PRIMARY KEY,
+                email TEXT UNIQUE,
+                password_hash TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """)
+
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_form_responses (
+                id SERIAL PRIMARY KEY,
+                assessment_id UUID NOT NULL,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                responses JSONB NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """)
         
         
         indexes = [
@@ -166,7 +188,11 @@ async def _init_postgres_database():
             "CREATE INDEX CONCURRENTLY IF NOT EXISTS documents_metadata_idx ON documents USING gin(metadata)",
             "CREATE INDEX CONCURRENTLY IF NOT EXISTS documents_created_at_idx ON documents(created_at)",
             "CREATE INDEX CONCURRENTLY IF NOT EXISTS conversation_history_session_idx ON conversation_history(session_id)",
-            "CREATE INDEX CONCURRENTLY IF NOT EXISTS conversation_history_created_at_idx ON conversation_history(created_at)"
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS conversation_history_created_at_idx ON conversation_history(created_at)",
+            # New indexes for users and form responses
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS user_form_responses_user_idx ON user_form_responses(user_id)",
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS user_form_responses_created_idx ON user_form_responses(created_at)",
+            "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS users_user_id_idx ON users(user_id)"
         ]
         
         for index_query in indexes:
@@ -185,7 +211,18 @@ async def _init_postgres_database():
         except Exception as e:
             logger.info(f"HNSW index creation skipped (will be created after data insertion): {e}")
         
-        
+        # Ensure optional columns exist for users table without breaking existing data
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE")
+        except Exception as e:
+            if "already exists" not in str(e):
+                logger.warning(f"Could not add email column: {e}")
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT")
+        except Exception as e:
+            if "already exists" not in str(e):
+                logger.warning(f"Could not add password_hash column: {e}")
+
     finally:
         await conn.close()
 

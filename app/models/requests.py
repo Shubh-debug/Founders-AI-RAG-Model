@@ -131,3 +131,44 @@ class ReasoningChainRequest(BaseModel):
     chain_id: Optional[str] = Field(default=None, description="Specific reasoning chain ID")
     session_id: Optional[str] = Field(default=None, description="Session ID to fetch all chains")
     limit: int = Field(default=10, ge=1, le=100, description="Maximum number of chains to retrieve")
+
+
+# ------------------------------------------------------------
+# USER RESPONSES SAVE/RETRIEVE
+# ------------------------------------------------------------
+class FormResponseItem(BaseModel):
+    # Flexible schema: accept either (id,type,answer) or (question,answer)
+    id: Optional[int] = None
+    type: Optional[str] = None
+    question: Optional[str] = None
+    answer: Any
+
+
+class SaveResponsesRequest(BaseModel):
+    userId: str = Field(..., description="Unique user identifier from frontend/auth")
+    responses: List[FormResponseItem]
+
+    @field_validator("userId")
+    def validate_user_id(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("userId is required")
+        return v.strip()
+
+    @field_validator("responses")
+    def validate_responses(cls, items: List[FormResponseItem]):
+        if not items:
+            raise ValueError("responses cannot be empty")
+        for it in items:
+            if it.answer is None:
+                raise ValueError("each response must include 'answer'")
+        return items
+
+
+class SaveResponsesResponse(BaseModel):
+    assessmentId: str
+
+
+class UserGuidelineResponse(BaseModel):
+    userId: str
+    guideline: str
+    assessmentId: Optional[str] = None

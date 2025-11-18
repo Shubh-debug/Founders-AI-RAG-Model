@@ -198,6 +198,37 @@ Content-Type: application/json
 }
 ```
 
+#### Save User Assessment Responses
+```http
+POST /save-responses
+Content-Type: application/json
+
+{
+   "userId": "user-123",
+   "responses": [
+      { "id": 1, "type": "options", "answer": "Individual consumers" },
+      { "id": 2, "type": "checkbox", "answer": ["Fundraising & Investment", "Technology & Development"] }
+   ]
+}
+
+Response:
+{
+   "assessmentId": "a3f4e2f2-..."
+}
+```
+
+#### Fetch User Guideline (for prompts)
+```http
+GET /user-guideline/{user_id}
+
+Response:
+{
+   "userId": "user-123",
+   "guideline": "User Profile Responses:\n- Q1: Individual consumers\n- Q2: Fundraising & Investment, Technology & Development",
+   "assessmentId": "a3f4e2f2-..."
+}
+```
+
 ### Response Format
 
 ```json

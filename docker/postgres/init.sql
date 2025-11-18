@@ -26,6 +26,24 @@ CREATE TABLE IF NOT EXISTS conversation_history (
 );
 
 
+-- Users and User Form Responses
+CREATE TABLE IF NOT EXISTS users (
+    user_id VARCHAR(255) PRIMARY KEY,
+    email TEXT UNIQUE,
+    password_hash TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_form_responses (
+    id SERIAL PRIMARY KEY,
+    assessment_id UUID NOT NULL,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    responses JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+
 CREATE INDEX CONCURRENTLY IF NOT EXISTS documents_content_idx ON documents USING gin(to_tsvector('english', content));
 CREATE INDEX CONCURRENTLY IF NOT EXISTS documents_title_idx ON documents(title) WHERE title IS NOT NULL;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS documents_source_idx ON documents(source) WHERE source IS NOT NULL;
@@ -38,6 +56,11 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS documents_updated_at_idx ON documents(up
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS conversation_history_session_idx ON conversation_history(session_id);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS conversation_history_created_at_idx ON conversation_history(created_at);
+
+-- Indexes for user personalization tables
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS users_user_id_idx ON users(user_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS user_form_responses_user_idx ON user_form_responses(user_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS user_form_responses_created_idx ON user_form_responses(created_at);
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

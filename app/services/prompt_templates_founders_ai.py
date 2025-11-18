@@ -54,7 +54,8 @@ class PromptTemplate:
         context: str,
         conflict_info: str = "",
         tone: Optional[str] = None,
-        depth: Optional[str] = None
+        depth: Optional[str] = None,
+        user_response_guideline: Optional[str] = None,
     ) -> str:
         """Generate the user content text for the LLM."""
         tone_instruction = ""
@@ -63,13 +64,18 @@ class PromptTemplate:
         if depth:
             tone_instruction += f" Depth: {depth.strip().lower()}."
 
+        # Merge base response guidelines with optional user personalization
         guidelines = self.response_guidelines + tone_instruction
+        if user_response_guideline:
+            # Keep personalization visible and clearly separated
+            guidelines += "\n\nUSER PROFILE GUIDELINES (from assessment):\n" + user_response_guideline.strip()
 
         mapping = {
             "query": query,
             "context": context,
             "conflict_info": conflict_info,
             "guidelines": guidelines,
+            "user_response_guideline": user_response_guideline or "",
         }
         try:
             return self.user_template.format_map(mapping)
@@ -312,12 +318,13 @@ class PromptTemplateManager:
         conflict_info: str = "",
         tone: Optional[str] = None,
         depth: Optional[str] = None,
+        user_response_guideline: Optional[str] = None,
     ) -> PromptDict:
         """Generate a complete (system + user) prompt, cached for performance."""
         refined = self.refine_context(context or "")
         context_hash = hashlib.sha256(refined.encode("utf-8")).hexdigest()
         return self._generate_cache(
-            intent.value, query, context_hash, refined, conflict_info or "", tone or "", depth or ""
+            intent.value, query, context_hash, refined, conflict_info or "", tone or "", depth or "", user_response_guideline or ""
         )
 
     def _generate_prompt_cached(
@@ -329,6 +336,7 @@ class PromptTemplateManager:
         conflict_info: str,
         tone: str,
         depth: str,
+        user_response_guideline: str,
     ) -> PromptDict:
         intent = self._intent_from_key(intent_value)
         template = self.get_template(intent)
@@ -338,6 +346,7 @@ class PromptTemplateManager:
             conflict_info=("\n\nConflict Info:\n" + conflict_info) if conflict_info else "",
             tone=tone or None,
             depth=depth or None,
+            user_response_guideline=user_response_guideline or None,
         )
         return {"system": template.system_prompt, "user": user_content}
 

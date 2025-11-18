@@ -21,5 +21,5 @@ COPY app ./app
 # Expose port for FastAPI
 EXPOSE 8000
 
-# Default command to run FastAPI (module path)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command to run FastAPI (respect Railway $PORT)
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -33,6 +33,9 @@ from ..models.requests import (
     ServiceInfoResponse,
     MultiHopReasoningResponse,
     ReasoningStepResponse,
+    SaveResponsesRequest,
+    SaveResponsesResponse,
+    UserGuidelineResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,6 +57,8 @@ async def get_service_info():
             "multi-hop": "/multi-hop",
             "feedback": "/feedback",
             "ingest-pdfs": "/ingest-pdfs",
+            "save-responses": "/save-responses",
+            "user-guideline": "/user-guideline/{user_id}",
         },
     )
 
@@ -278,4 +283,37 @@ async def submit_feedback(feedback_data: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=500, detail="Failed to submit feedback")
     except Exception as e:
         logger.error(f"Feedback submission failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------
+# USER RESPONSES SAVE & PERSONALIZATION GUIDELINE
+# ---------------------------------------------------------------------
+@router.post("/save-responses", response_model=SaveResponsesResponse)
+async def save_user_responses(payload: SaveResponsesRequest = Body(...)):
+    """Persist the user's assessment responses and return an assessmentId."""
+    try:
+        from ..services.user_profile_service import save_user_form_responses
+
+        assessment_id = await save_user_form_responses(payload.userId, [r.model_dump() for r in payload.responses])
+        return SaveResponsesResponse(assessmentId=assessment_id)
+    except Exception as e:
+        logger.error(f"Saving user responses failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/user-guideline/{user_id}", response_model=UserGuidelineResponse)
+async def get_user_guideline(user_id: str):
+    """Return a formatted guideline string derived from latest user responses."""
+    try:
+        from ..services.user_profile_service import get_latest_user_form_responses, format_user_response_guideline
+
+        row = await get_latest_user_form_responses(user_id)
+        if not row:
+            return UserGuidelineResponse(userId=user_id, guideline="", assessmentId=None)
+
+        guideline = format_user_response_guideline(row.get("responses", []))
+        return UserGuidelineResponse(userId=user_id, guideline=guideline, assessmentId=str(row.get("assessment_id")))
+    except Exception as e:
+        logger.error(f"Fetching user guideline failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
