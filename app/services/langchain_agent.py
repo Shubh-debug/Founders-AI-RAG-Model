@@ -57,7 +57,7 @@ if LANGCHAIN_AVAILABLE:
         def _run(self, text: str) -> str:
             """Extract startup metrics from text"""
             try:
-                from startup_tools import extract_startup_citations
+                from .startup_tools import extract_startup_citations
                 metrics = extract_startup_citations(text)
                 if metrics:
                     return f"Found startup metrics: {', '.join(metrics)}"
@@ -80,7 +80,7 @@ if LANGCHAIN_AVAILABLE:
         def _run(self, text: str) -> str:
             """Classify startup sector"""
             try:
-                from startup_classifier import startup_classifier
+                from .startup_classifier import startup_classifier
                 result = startup_classifier.classify(text)
                 return f"Sector: {result['category']} (confidence: {result['confidence']:.2f})"
             except Exception as e:
@@ -108,7 +108,7 @@ if LANGCHAIN_AVAILABLE:
         async def _arun(self, query: str) -> str:
             """Async version of startup research"""
             try:
-                from lightweight_llm_rag_founders_ai import lightweight_llm_rag
+                from .lightweight_llm_rag_founders_ai import lightweight_llm_rag
                 result = await lightweight_llm_rag.process_query(query=query, top_k=5)
                 return f"Startup case study insights: {result.get('response', 'No results found')}"
             except Exception as e:
@@ -229,7 +229,7 @@ Available tools:
             agent_response = result["output"]
 
             # Get case study sources
-            from lightweight_llm_rag_founders_ai import lightweight_llm_rag
+            from .lightweight_llm_rag_founders_ai import lightweight_llm_rag
             rag_result = await lightweight_llm_rag.process_query(
                 query=query,
                 top_k=5
@@ -237,11 +237,11 @@ Available tools:
             sources = rag_result.get("sources", [])
 
             # Extract metrics
-            from startup_tools import extract_startup_citations
+            from .startup_tools import extract_startup_citations
             citations = extract_startup_citations(agent_response)
 
             # Classify sector
-            from startup_classifier import startup_classifier
+            from .startup_classifier import startup_classifier
             sector_result = startup_classifier.classify(query)
             sector = sector_result["category"]
             confidence = sector_result["confidence"]
@@ -279,7 +279,7 @@ Available tools:
         """
         try:
             # Query RAG directly
-            from lightweight_llm_rag_founders_ai import lightweight_llm_rag
+            from .lightweight_llm_rag_founders_ai import lightweight_llm_rag
             rag_result = await lightweight_llm_rag.process_query(
                 query=query,
                 top_k=5
@@ -288,11 +288,11 @@ Available tools:
             sources = rag_result.get("sources", [])
 
             # Extract metrics
-            from startup_tools import extract_startup_citations
+            from .startup_tools import extract_startup_citations
             citations = extract_startup_citations(response)
 
             # Classify sector
-            from startup_classifier import startup_classifier
+            from .startup_classifier import startup_classifier
             sector_result = startup_classifier.classify(query)
             sector = sector_result["category"]
             confidence = sector_result["confidence"]
@@ -362,3 +362,5 @@ Available tools:
 
 # Global instance for easy importing
 langchain_startup_agent = LangChainStartupAgent()
+# Backward-compatible alias expected by lifecycle initializer
+langchain_legal_agent = langchain_startup_agent
