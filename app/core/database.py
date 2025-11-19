@@ -226,6 +226,17 @@ async def _init_postgres_database():
         except Exception as e:
             if "already exists" not in str(e):
                 logger.warning(f"Could not add password_hash column: {e}")
+        # Backfill timestamps if older schema exists without them
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()")
+        except Exception as e:
+            if "already exists" not in str(e):
+                logger.warning(f"Could not add created_at column: {e}")
+        try:
+            await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()")
+        except Exception as e:
+            if "already exists" not in str(e):
+                logger.warning(f"Could not add updated_at column: {e}")
 
     finally:
         await conn.close()
